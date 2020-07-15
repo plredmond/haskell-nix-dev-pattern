@@ -5,8 +5,6 @@
 * Release with `nix-build`.
     * Do not run `nix-build` inside `nix-shell` because that won't produce a `result` containing your project.
 
-This pattern, along with the contents of `versions.json`, `default.nix` etc is from [vaibhavsagar](http://github.com/vaibhavsagar) who writes about pinning in [Quick and Easy Nixpkgs Pinning](https://vaibhavsagar.com/blog/2018/05/27/quick-easy-nixpkgs-pinning/).
-
 # Doctest sharp edges
 
 Tests are implemented with doctest, which currently requires `.ghc.environment*` files to be present.
@@ -32,11 +30,14 @@ set -e -u -o pipefail
 set -x
 if [ -n "${IN_NIX_SHELL:-}" ]; then
     # v2-build must run first to write out a .ghc.environment* file for doctest to use
-    cabal v2-build
+    cabal v2-build --write-ghc-environment-files=always
     cabal v2-test
 else
     # if a .ghc.environment* file is around, it must be ignored or it will break the isolated nix-build
     nix-build
+
+    # also test cabal here for good measure
+    nix-shell --run 'cabal v2-build --write-ghc-environment-files=always && cabal v2-test'
 fi
 ```
 
@@ -71,10 +72,3 @@ function disallow_nix_shell {
 }
 alias nix-build='disallow_nix_shell nix-build'
 ```
-
-# TODO
-
-explore how overriding dependency versions works
-
-* https://gist.github.com/vaibhavsagar/11b135faa1f95cd483b26e34e8752000#file-default-nix-L68-L98
-* https://gist.github.com/vaibhavsagar/212273a6af6896fb79dd2c866b03ce5a

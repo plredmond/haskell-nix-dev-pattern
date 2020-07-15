@@ -6,13 +6,13 @@ import qualified Paths_abcexample
 -- $setup
 -- >>> import Test.QuickCheck
 
-
--- | Main in the library
+-- |
 --
 -- >>> 1 + 1
 -- 2
 --
--- prop> \(Small n) -> n * 2 == n + n
+-- prop> \n -> n * 2 == n + n
+--
 main :: IO ()
 main = do
     putStrLn "Hello world!"
