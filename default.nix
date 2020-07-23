@@ -8,12 +8,11 @@ let
     }
   ) { inherit config; };
   # fetch pinned version of liquidhaskell
-  lh = nixpkgs.fetchFromGitHub {
+  lh-src = nixpkgs.fetchFromGitHub {
     owner = "ucsd-progsys";
     repo = "liquidhaskell";
-    rev = "3bc467162ba285bf2c1529dafce21a20bb9aab8e";
-    sha256 = "0qcmadfpanf9ivbf25kwrpggq515dq90alhnm7zm5qn8yg2qw7xg";
-    fetchSubmodules = true; # liquid-fixpoint is a submodule
+    rev = "26cad4f05171669949fd92fa5a5f584a4950ca7b";
+    sha256 = "1xvm005xhzlfm7b7hvc2jr667sgmy9mg47daiw6mmxkfblzjzafa";
   };
   # function to make sure a haskell package has z3 at build-time and test-time
   usingZ3 = pkg: nixpkgs.haskell.lib.overrideCabal pkg (old: { buildTools = old.buildTools or [] ++ [ nixpkgs.z3 ]; });
@@ -26,10 +25,34 @@ let
       };
       overrides = self: super: with nixpkgs.haskell.lib; rec {
         # parts of liquidhaskell are not yet on hackage, and the hackage version is old, so here we build all needed components from source
-        liquid-base = usingZ3 (self.callCabal2nix "liquid-base" (lh + "/liquid-base") { inherit liquid-ghc-prim; inherit liquidhaskell; });
-        liquid-ghc-prim = usingZ3 (self.callCabal2nix "liquid-ghc-prim" (lh + "/liquid-ghc-prim") { inherit liquidhaskell; });
-        liquidhaskell = dontCheck (self.callCabal2nix "liquidhaskell" lh { inherit liquid-fixpoint; });
-        liquid-fixpoint = self.callCabal2nix "liquid-fixpoint" (lh + "/liquid-fixpoint") {};
+        liquid-base =
+          dontHaddock (
+            usingZ3 (
+              self.callCabal2nix "liquid-base" (lh-src + "/liquid-base")
+                { inherit liquid-ghc-prim; inherit liquidhaskell; }
+            )
+          );
+        liquid-ghc-prim =
+          dontHaddock (
+            usingZ3 (
+              self.callCabal2nix "liquid-ghc-prim" (lh-src + "/liquid-ghc-prim")
+                { inherit liquidhaskell; }
+            )
+          );
+        liquidhaskell =
+          dontCheck (
+            self.callCabal2nix "liquidhaskell" lh-src
+              { inherit liquid-fixpoint; }
+          );
+        liquid-fixpoint =
+          self.callCabal2nix "liquid-fixpoint" (
+            nixpkgs.fetchFromGitHub {
+              owner = "ucsd-progsys";
+              repo = "liquid-fixpoint";
+              rev = "a4e303bc55e8f596893e661954e20c983a61215f";
+              sha256 = "0md40v4dkps370idf66fhskbr3hhvd65ipx8ygvchpsqrpiskhql";
+            }
+          ) {};
         # some dependencies of liquidhaskell had problems with version ranges or tests
         ChasingBottoms = doJailbreak super.ChasingBottoms;
         Diff = dontCheck super.Diff;
@@ -53,6 +76,13 @@ let
   # ignore files specified by gitignore in nix-build
   source = nixpkgs.nix-gitignore.gitignoreSource [] ./.;
   # use overridden-haskellPackages to call gitignored-source
-  drv = usingDoctest (usingZ3 (haskellPackages.callCabal2nix "abcexample" source {}));
+  drv =
+    usingDoctest (
+      usingZ3 (
+        nixpkgs.haskell.lib.dontHaddock (
+          haskellPackages.callCabal2nix "abcexample" source {}
+        )
+      )
+    );
 in
 if nixpkgs.lib.inNixShell then drv.env.overrideAttrs devtools else drv
